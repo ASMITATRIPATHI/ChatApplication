@@ -5,6 +5,8 @@ import SockJS from "sockjs-client";
 var stompClient = null;
 
 const ChatRoom = () => {
+  const [publicChats, setPublicChats] = useState([]);
+  const [privateChats, setPrivateChats] = useState(new Map());
   const [userData, setUserData] = useState({
     username: "",
     recieverName: "",
@@ -32,10 +34,66 @@ const ChatRoom = () => {
     );
   };
 
+  const onPublicMessageReceived = (payload) => {
+    let payloadData = JSON.parse(payload.body);
+    switch (payloadData.status) {
+      case "JOIN":
+        if (privateChats.get(payloadData.senderName)) {
+          privateChats.set(payloadData.senderName, []);
+          setPrivateChats(new Map(privateChats));
+        }
+        break;
+      case "MESSAGE":
+        publicChats.push(payloadData);
+        setPublicChats([...publicChats]);
+        break;
+    }
+  };
+
+  const onPrivateMessageReceived = (payload) => {
+    let payloadData = JSON.parse(payload);
+    if (privateChats.get(payloadData.senderName)) {
+      privateChats.get(payloadData.senderName).push(payloadData);
+      setPrivateChats(new Map(privateChats));
+    } else {
+      let list = [];
+      list.push(payloadData);
+      privateChats.set(payloadData.senderName, list);
+      setPrivateChats(new Map(privateChats));
+    }
+  };
+  const onError = (err) => {
+    console.log(err);
+  };
+
   return (
     <div className="container">
       {userData.connected ? (
-        <div></div>
+        <div className="chat-box">
+          <div className="member-list">
+            <ul>
+              <li>Chatroom</li>
+              {[...privateChats.keys()].map((name, index) => (
+                <li className="member" key={index}>
+                  {name}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="chat-content">
+            {publicChats.map((chat, index) => (
+              <li className="message" key={index}>
+                {chat.senderName !== userData.username && (
+                  <div className="avatar">{chat.senderName}</div>
+                )}
+                <div className="message-data">{chat.message}</div>
+                {chat.senderName === userData.username && (
+                  <div className="avatar self">{chat.senderName}</div>
+                )}
+              </li>
+            ))}
+          </div>
+        </div>
       ) : (
         <div className="register">
           <input
